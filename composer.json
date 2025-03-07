@@ -1,0 +1,24 @@
+{
+    "name": "slouch-cms/client",
+    "description": "A client API for use with the Slouch CMS",
+    "autoload": {
+        "psr-4": {
+            "Phnxdgtl\\UnnamedCmsClient\\": "src"
+        }
+    },
+    "require": {
+        "laravel/framework": "^10.0"       
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "SlouceCMS\\Client\\SlouchCMSServiceProvider"
+            ]
+        }
+    },
+    "config": {
+        "allow-plugins": {
+            "php-http/discovery": true
+        }
+    }
+}
