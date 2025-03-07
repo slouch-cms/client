@@ -2,7 +2,7 @@
 
 namespace SlouchCMS\Client;
 
-use Phnxdgtl\UnnamedCmsClient\UnnamedCmsClientMiddleware;
+// use SlouchCMS\Client\SlouchCMSMiddleware;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 

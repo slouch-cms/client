@@ -3,7 +3,7 @@
     "description": "A client API for use with the Slouch CMS",
     "autoload": {
         "psr-4": {
-            "Phnxdgtl\\UnnamedCmsClient\\": "src"
+            "SlouchCMS\\Client\\": "src"
         }
     },
     "require": {
