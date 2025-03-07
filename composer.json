@@ -12,7 +12,7 @@
     "extra": {
         "laravel": {
             "providers": [
-                "SlouceCMS\\Client\\SlouchCMSServiceProvider"
+                "SlouchCMS\\Client\\SlouchCMSServiceProvider"
             ]
         }
     },

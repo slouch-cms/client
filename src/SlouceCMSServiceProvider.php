@@ -6,7 +6,7 @@ use Phnxdgtl\UnnamedCmsClient\UnnamedCmsClientMiddleware;
 use Illuminate\Routing\Router;
 use Illuminate\Support\ServiceProvider;
 
-class SlouceCMSServiceProvider extends ServiceProvider
+class SlouchCMSServiceProvider extends ServiceProvider
 {
     /**
      * Register services.
