@@ -107,7 +107,11 @@ class SlouchCMSController extends Controller
 		 if (!empty($input['filter'])) {
 			$query->where($input['filter']['column'], $input['filter']['value']);
 		 }
-		 $data  = $query->get();
+		 if (!empty($request->query('page'))) {
+			$data  = $query->paginate(50);
+		 } else {
+			$data  = $query->get();
+		 }
 
 		 if (count($data) == 0) {
 			/**

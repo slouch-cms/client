@@ -16,7 +16,7 @@ class SlouchCMSMiddleware
     public function handle(Request $request, Closure $next): Response
     {
 
-        $key   = env('SLOUCH_CMS_KEY');
+        $key   = env('SLOUCH_CMS_KEY');        
         $token = $request->bearerToken();
         if (!$key || $token != $key) {
             return response()->json('Unauthorized', 401);
