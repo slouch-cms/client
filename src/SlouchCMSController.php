@@ -7,10 +7,13 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Contracts\Container\BindingResolutionException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Redis;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\ValidationException;
 use Illuminate\Support\Str;
+use PDO;
 
 class SlouchCMSController extends Controller
 {
@@ -62,6 +65,7 @@ class SlouchCMSController extends Controller
 			'select' => 'required|array',
 			'join'   => 'array',
 			'filter' => 'array',
+			'images' => 'array',
 		]);
 
 		if ($validator->fails()) {
@@ -73,9 +77,12 @@ class SlouchCMSController extends Controller
 		/**
 		 * TODO: Implement the Eloquent approach here too
 		 */
+		
+		$selects = $input['select'] ?? [];
+		Log::debug($selects);
 
 		 $query = DB::table($input['table']);
-		 foreach ($input['select'] as $select) {	
+		 foreach ($selects as $select) {	
 			if (is_array($select)) {
 				$query->addSelect(DB::raw(sprintf(					
 					"JSON_REMOVE(
@@ -113,7 +120,23 @@ class SlouchCMSController extends Controller
 			$data  = $query->get();
 		 }
 
-		 if (count($data) == 0) {
+
+		/**
+		 * Process images here.
+		 */
+		if ($images = $input['images'] ?? false) {
+			$data->each(function ($item, $key) use ($images) {
+				// Do something with each user
+				foreach ($images as $image) {
+					if (empty($item->{$image})) {
+						continue;
+					}
+					$item->{$image} = Storage::disk('public')->url($item->{$image});
+				}
+			});
+		}
+
+		if (count($data) == 0) {
 			/**
 			 * To return an empty array as JSON, convert [] to an object
 			 * This is necessary so that the server can identify the response as JSON;
@@ -192,6 +215,7 @@ class SlouchCMSController extends Controller
 			}
 		}
 
+
 		return response()->json($data);
 	}
 
@@ -202,6 +226,7 @@ class SlouchCMSController extends Controller
 	 * @throws ValidationException 
      */
     public function putRecord(Request $request) {
+
 		$validator = Validator::make($request->all(), [
 			'table'     => 'required',
 			'data'      => 'required|array',
@@ -334,13 +359,26 @@ class SlouchCMSController extends Controller
 					unset($relationships[$relationship_name]);
 				}
 			}
-
-			DB::table($table)->upsert(
-				$columns + ['id' => $object_id],
-				['id'],
-				array_keys($columns)				
-			);
-			$object_id = DB::getPdo()->lastInsertId();
+			try {
+				DB::table($table)->upsert(
+					$columns + ['id' => $object_id],
+					['id'],
+					array_keys($columns)				
+				);
+				$object_id = DB::getPdo()->lastInsertId();
+			} catch(\Illuminate\Database\QueryException $e){ 
+				if ($e->getCode() == 23000) {
+					$error = sprintf('Database error: %s. Consider making this field mandatory.', $e->errorInfo[2]);
+				} else {
+					$error = $e->getMessage(); 
+				}
+				
+				$response = [
+					'success'   => false,
+					'error'     => $error,
+					'object_id' => $object_id,
+				];
+			}
 		}
 		foreach ($relationships as $relationship_name=>$relationship) {	
 			
@@ -372,10 +410,15 @@ class SlouchCMSController extends Controller
 			}
 		}
 
-		$response = [
-			'success'   => true,
-			'object_id' => $object_id,
-		];
+		/**
+		 * If we've set a response already, assume it's an error
+		 */
+		if (!isset($response)) {
+			$response = [
+				'success'   => true,
+				'object_id' => $object_id,
+			];
+		}
 		return response()->json($response);
 	}
 
