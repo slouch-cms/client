@@ -122,13 +122,15 @@ class SlouchCMSController extends Controller
 
 
 		/**
-		 * Process images here.
+		 * Convert relative image paths to full URLs
 		 */
 		if ($images = $input['images'] ?? false) {
 			$data->each(function ($item, $key) use ($images) {
-				// Do something with each user
 				foreach ($images as $image) {
-					if (empty($item->{$image})) {
+					/**
+					 * Ignore the value if it's empty, or if it's already a full URL
+					 */
+					if (empty($item->{$image}) || filter_var($item->{$image}, FILTER_VALIDATE_URL)) {
 						continue;
 					}
 					$item->{$image} = Storage::disk('public')->url($item->{$image});
@@ -160,6 +162,7 @@ class SlouchCMSController extends Controller
 			'select'    => 'required|array',
 			'join'      => 'sometimes|array',
 			'object_id' => 'required|numeric',
+			'images'    => 'sometimes|array',
 		]);
 
 		if ($validator->fails()) {
@@ -207,6 +210,23 @@ class SlouchCMSController extends Controller
 		 $data  = $query->first();
 
 		/**
+		 * Convert relative image paths to full URLs
+		 * TODO: repetition here
+		 */
+		if ($images = $input['images'] ?? false) {
+			
+			foreach ($images as $image) {
+				/**
+				 * Ignore the value if it's empty, or if it's already a full URL
+				 */
+				if (empty($data->{$image}) || filter_var($data->{$image}, FILTER_VALIDATE_URL)) {
+					continue;
+				}
+				$data->{$image} = Storage::disk('public')->url($data->{$image});
+			}
+		}
+
+		/**
 		 * Is this where we should convert the returned JSON into an array?
 		*/
 		foreach ($input['select'] as $select) {
@@ -214,6 +234,8 @@ class SlouchCMSController extends Controller
 				$data->{$select['as']} = json_decode($data->{$select['as']}, true);
 			}
 		}
+
+
 
 
 		return response()->json($data);
