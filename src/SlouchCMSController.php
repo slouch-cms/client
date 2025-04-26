@@ -73,20 +73,25 @@ class SlouchCMSController extends Controller
 		}
 
 		$input = $validator->validated();
-
+		Log::debug($input);
 		/**
 		 * TODO: Implement the Eloquent approach here too
 		 */
 		
 		$selects = $input['select'] ?? [];
-		Log::debug($selects);
 
 		 $query = DB::table($input['table']);
 		 foreach ($selects as $select) {	
 			if (is_array($select)) {
+				/**
+				 * Currently we return the ID and string of a related item in a JSON array
+				 * I'm not sure this is ideal... for has one relationships, we should just return the 
+				 * string, and query (eg) team_id if we need it. But -- for HasMany relationships, 
+				 * how does that work? Let's implement has many in the CMS first, the review this?
+				 **/
 				$query->addSelect(DB::raw(sprintf(					
 					"JSON_REMOVE(
-						JSON_OBJECT(
+						JSON_OBJECTAGG(
 								IFNULL(%s, 'null__'),
 								%s
 						),
@@ -97,7 +102,15 @@ class SlouchCMSController extends Controller
 					$select['as']
 				)));
 			} else {		
-				$query->addSelect($select);
+				// $query->addSelect($select);
+				Log::debug($select);
+				$field_name = explode('.', $select);
+				if (count($field_name) > 1) {
+					$field_name = array_pop($field_name);
+				} else {
+					$field_name = $select;
+				}
+				$query->select(DB::raw(sprintf('ANY_VALUE(%s) AS %s', $select, $field_name)));
 			}
 		 }
 		 foreach ($input['join'] ?? [] as $join) {
@@ -110,10 +123,16 @@ class SlouchCMSController extends Controller
 		 }
 		 /**
 		  * TODO... do we need to validate the filter here? To what extent?
+		  * Are we even using filters in Filament? I suspect not
 		  */
 		 if (!empty($input['filter'])) {
 			$query->where($input['filter']['column'], $input['filter']['value']);
 		 }
+
+		 $query->groupBy(sprintf("%s.id", $input['table']));
+
+		 Log::debug($query->toRawSql());
+
 		 if (!empty($request->query('page'))) {
 			$data  = $query->paginate(50);
 		 } else {
@@ -147,97 +166,6 @@ class SlouchCMSController extends Controller
 			$data = (object)[];			
 		 }
 		 
-		return response()->json($data);
-	}
-
-	/**
-	 * Return data about a single object
-     * @param Request $request 
-     * @return mixed 
-	 * @throws ValidationException 
-     */
-    public function getRecord(Request $request) {
-		$validator = Validator::make($request->all(), [
-			'table'     => 'required',
-			'select'    => 'required|array',
-			'join'      => 'sometimes|array',
-			'object_id' => 'required|numeric',
-			'images'    => 'sometimes|array',
-		]);
-
-		if ($validator->fails()) {
-			return response()->json($validator->errors(), 422);
-		}
-
-		$input = $validator->validated();
-
-		/**
-		 * TODO: Implement the Eloquent approach here too
-		 */
-
-		 $query = DB::table($input['table']);
-		 foreach ($input['select'] as $select) {
-			 if (is_array($select)) {
-				 $query->addSelect(DB::raw(sprintf(
-					 "JSON_REMOVE(
-						 JSON_OBJECTAGG(
-							 IFNULL(%s, 'null__'),
-							 %s
-						 ),
-						 '$.null__'
-					 ) AS %s",
-					 $select['id'],
-					 $select['name'],
-					 $select['as']
-				 )));
-			 } else {
-				 $query->addSelect($select);
-			 }
-		 }
- 
-		 foreach ($input['join'] as $join) {
-			 $query->leftJoin(
-				 $join['table'],
-				 $join['foreign_column'],
-				 '=',
-				 $join['local_column'],
-			 );
-		 }
- 
-		 $query->where(sprintf("%s.id", $input['table']), $input['object_id']);
-		 $query->groupBy(sprintf("%s.id", $input['table']));
- 
-		 $data  = $query->first();
-
-		/**
-		 * Convert relative image paths to full URLs
-		 * TODO: repetition here
-		 */
-		if ($images = $input['images'] ?? false) {
-			
-			foreach ($images as $image) {
-				/**
-				 * Ignore the value if it's empty, or if it's already a full URL
-				 */
-				if (empty($data->{$image}) || filter_var($data->{$image}, FILTER_VALIDATE_URL)) {
-					continue;
-				}
-				$data->{$image} = Storage::disk('public')->url($data->{$image});
-			}
-		}
-
-		/**
-		 * Is this where we should convert the returned JSON into an array?
-		*/
-		foreach ($input['select'] as $select) {
-			if (is_array($select)) {
-				$data->{$select['as']} = json_decode($data->{$select['as']}, true);
-			}
-		}
-
-
-
-
 		return response()->json($data);
 	}
 
